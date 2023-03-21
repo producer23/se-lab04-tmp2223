@@ -30,30 +30,24 @@ class Session extends Thread {
     }
 
     public void run() {
-        try (DataInputStream input = new DataInputStream(socket.getInputStream());DataOutputStream output = new DataOutputStream(socket.getOutputStream())) {
-            output.writeUTF("Enter your login:");
-            String login = input.readUTF();
+        try (
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream())) {
 
-            UserData user = ServerData.getInstance().addUser(login);
-
+            // start
             for (int i = 0; i < 15; i++) {
-                output.writeUTF("Enter action (1 - get a file, 2 - save a file, 3 - delete a file):");
-                int commandFromClient = input.readInt();
 
-                switch (commandFromClient) {
-                    case 1 -> {
-                        output.writeUTF("Do you want to get the file by name or by id (1 - name, 2 - id):");
+                String action = input.readUTF();
 
+                switch (action) {
+                    case "1" -> {
                         int nameOrID = input.readInt();
 
                         switch (nameOrID) {
                             case 1 -> {
-                                output.writeUTF("Enter name:");
                                 String fileName = input.readUTF();
 
-                                output.writeUTF("The request was sent.");
-
-                                byte[] data = ServerData.getInstance().getUser(login).getFile(fileName);
+                                byte[] data = ServerData.getInstance().getFile(fileName);
                                 if (data != null) {
                                     output.writeInt(data.length);
                                 } else {
@@ -61,18 +55,14 @@ class Session extends Thread {
                                     break;
                                 }
                                 output.write(data);
-
-                                output.writeUTF("The file was downloaded! Specify a name for it:");
-
-                                output.writeUTF("File saved on the hard drive!");
                             }
                             case 2 -> {
-                                output.writeUTF("Enter id:");
                                 long id = input.readLong();
+                                if (id == -1) {
+                                    break;
+                                }
 
-                                output.writeUTF("The request was sent.");
-
-                                byte[] data = ServerData.getInstance().getUser(login).getFile(id);
+                                byte[] data = ServerData.getInstance().getFile(id);
                                 if (data != null) {
                                     output.writeInt(data.length);
                                 } else {
@@ -80,42 +70,48 @@ class Session extends Thread {
                                     break;
                                 }
                                 output.write(data);
-
-                                output.writeUTF("The file was downloaded! Specify a name for it:");
-
-                                output.writeUTF("File saved on the hard drive!");
+                                String fileName = ServerData.getInstance().getFileName(id);
+                                output.writeUTF(fileName.substring(fileName.indexOf(".")));
                             }
                         }
                     }
-                    case 2 -> {
-                        output.writeUTF("Enter name of the file:");
+                    case "2" -> {
+                        // 1
                         String fileName = input.readUTF();
 
                         if (fileName.equals("upload error")) {
                             break;
                         }
 
+                        // 2
                         int length = input.readInt();
-                        byte[] file = new byte[length];
-                        input.readFully(file, 0, file.length);
+                        byte[] data = new byte[length];
+                        // 3
+                        input.readFully(data, 0, data.length);
 
-                        output.writeUTF("The request was sent.");
-                        long id = user.addFile(fileName, file);
+                        // 4
+                        String serverFileName = input.readUTF() + fileName.substring(fileName.indexOf("."));
+
+                        if (ServerData.getInstance().existsFileName(serverFileName)) {
+                            // 5
+                            output.writeBoolean(true);
+                            break;
+                        } else {
+                            // 5
+                            output.writeBoolean(false);
+                        }
+
+                        long id = ServerData.getInstance().addFile(serverFileName, data);
                         output.writeUTF("Response says that file is saved! ID = " + id);
                     }
-                    case 3 -> {
-                        output.writeUTF("Do you want to get the file by name or by id (1 - name, 2 - id):");
-
+                    case "3" -> {
                         int nameOrID = input.readInt();
 
                         switch (nameOrID) {
                             case 1 -> {
-                                output.writeUTF("Enter name:");
                                 String fileName = input.readUTF();
 
-                                output.writeUTF("The request was sent.");
-
-                                boolean deleted = ServerData.getInstance().getUser(login).deleteFile(fileName);
+                                boolean deleted = ServerData.getInstance().deleteFile(fileName);
 
                                 if (deleted) {
                                     output.writeUTF("The response says that this file was deleted successfully!");
@@ -124,12 +120,9 @@ class Session extends Thread {
                                 }
                             }
                             case 2 -> {
-                                output.writeUTF("Enter id:");
                                 long id = input.readLong();
 
-                                output.writeUTF("The request was sent.");
-
-                                boolean deleted = ServerData.getInstance().getUser(login).deleteFile(id);
+                                boolean deleted = ServerData.getInstance().deleteFile(id);
 
                                 if (deleted) {
                                     output.writeUTF("The response says that this file was deleted successfully!");
@@ -139,9 +132,24 @@ class Session extends Thread {
                             }
                         }
                     }
+                    default -> {
+                        String command = input.readUTF();
+                        switch (command) {
+                            case "save" -> {
+                                ServerData.getInstance().save();
+                            }
+                            case "exit" -> {
+                                ServerData.getInstance().save();
+                                System.exit(0);
+                            }
+                        }
+
+                    }
                 }
             }
+
             socket.close();
+
         } catch (IOException e) {
             e.printStackTrace();
         }

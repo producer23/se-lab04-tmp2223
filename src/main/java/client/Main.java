@@ -13,31 +13,27 @@ public class Main {
     private static final int SERVER_PORT = 34522;
 
     public static void main(String[] args) {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT); DataInputStream input = new DataInputStream(socket.getInputStream()); DataOutputStream output = new DataOutputStream(socket.getOutputStream())) {
+        try (
+                Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                DataInputStream input = new DataInputStream(socket.getInputStream());
+                DataOutputStream output = new DataOutputStream(socket.getOutputStream())) {
+
             Scanner scanner = new Scanner(System.in);
 
-            // enter login
-            System.out.println(input.readUTF());
-            output.writeUTF(scanner.nextLine().trim());
-
+            // start
             for (int i = 0; i < 15; i++) {
 
-                // enter command
-                System.out.println(input.readUTF());
+                System.out.println("Enter action (1 - get a file, 2 - save a file, 3 - delete a file):");
 
-                // push command
-                int myCommand = -1;
-                try {
-                    myCommand = Integer.parseInt(scanner.nextLine().trim());
-                } catch (Exception e) {
-                    System.out.println("Wrong answer!");
-                }
-                output.writeInt(myCommand);
+                // enter action
+                String action = scanner.nextLine();
 
-                switch (myCommand) {
-                    case 1 -> {
-                        // name or id?
-                        System.out.println(input.readUTF());
+                // push action
+                output.writeUTF(action);
+
+                switch (action) {
+                    case "1" -> {
+                        System.out.println("Do you want to get the file by name or by id (1 - name, 2 - id):");
 
                         int nameOrID = -1;
                         try {
@@ -49,14 +45,13 @@ public class Main {
 
                         switch (nameOrID) {
                             case 1 -> {
-                                // enter file name
-                                System.out.println(input.readUTF());
-                                output.writeUTF(scanner.nextLine());
+                                System.out.println("Enter name:");
+                                String serverFileName = scanner.nextLine();
+                                output.writeUTF(serverFileName);
 
-                                // req
-                                System.out.println(input.readUTF());
+                                System.out.println("The request was sent.");
 
-                                // file
+                                // get file from server
                                 int length = input.readInt();
                                 if (length == -1) {
                                     System.out.println("The response says that this file is not found!");
@@ -65,52 +60,51 @@ public class Main {
                                 byte[] data = new byte[length];
                                 input.readFully(data, 0, data.length);
 
-                                // new name for file
-                                System.out.println(input.readUTF());
-                                String fileName = scanner.nextLine();
+                                System.out.println("The file was downloaded! Specify a name for it:");
+                                String fileName = scanner.nextLine() + serverFileName.substring(serverFileName.indexOf("."));
+
                                 File file = new File("src/main/java/client/data/" + fileName);
                                 Files.write(file.toPath(), data);
 
-                                System.out.println(input.readUTF());
+                                System.out.println("File saved on the hard drive!");
                             }
                             case 2 -> {
-                                // enter file id
-                                System.out.println(input.readUTF());
+                                System.out.println("Enter id:");
                                 long id = -1;
                                 try {
-                                    id = Long.parseLong(scanner.nextLine().trim());
-                                } catch (Exception ignored) {
+                                    id = Long.parseLong(scanner.nextLine());
+                                } catch (Exception e) {
+                                    System.out.println("Wrong answer!");
+                                    output.writeLong(id);
+                                    break;
                                 }
                                 output.writeLong(id);
 
-                                // req
-                                System.out.println(input.readUTF());
+                                System.out.println("The request was sent.");
 
-                                // file
+                                // get file from server
                                 int length = input.readInt();
                                 if (length == -1) {
-                                    System.out.println("404 file not found!");
+                                    System.out.println("The response says that this file is not found!");
                                     break;
                                 }
                                 byte[] data = new byte[length];
                                 input.readFully(data, 0, data.length);
 
-                                // new name for file
-                                System.out.println(input.readUTF());
-                                String fileName = scanner.nextLine();
+                                System.out.println("The file was downloaded! Specify a name for it:");
+                                String fileName = scanner.nextLine() + input.readUTF();
+
                                 File file = new File("src/main/java/client/data/" + fileName);
                                 Files.write(file.toPath(), data);
 
-                                System.out.println(input.readUTF());
+                                System.out.println("File saved on the hard drive!");
                             }
                         }
                     }
-                    case 2 -> {
-                        // enter name
-                        System.out.println(input.readUTF());
-
-                        // push name
+                    case "2" -> {
+                        System.out.println("Enter name of the file:");
                         String fileName = scanner.nextLine();
+
                         byte[] file;
                         try {
                             file = Files.readAllBytes(new File("src/main/java/client/data/" + fileName).toPath());
@@ -119,17 +113,32 @@ public class Main {
                             output.writeUTF("upload error");
                             break;
                         }
+
+                        // 1
                         output.writeUTF(fileName);
+                        // 2
                         output.writeInt(file.length);
+                        // 3
                         output.write(file);
 
-                        // req and final
-                        System.out.println(input.readUTF());
-                        System.out.println(input.readUTF());
+                        System.out.println("Enter name of the file to be saved on server:");
+                        String serverFileName = scanner.nextLine();
+
+                        // 4
+                        output.writeUTF(serverFileName);
+                        System.out.println("The request was sent.");
+
+                        // 5
+                        boolean status = input.readBoolean();
+                        if (status) {
+                            System.out.println("This file name is already used on the server!");
+                            break;
+                        } else {
+                            System.out.println(input.readUTF());
+                        }
                     }
-                    case 3 -> {
-                        // name or id?
-                        System.out.println(input.readUTF());
+                    case "3" -> {
+                        System.out.println("Do you want to get the file by name or by id (1 - name, 2 - id):");
 
                         int nameOrID = -1;
                         try {
@@ -141,34 +150,38 @@ public class Main {
 
                         switch (nameOrID) {
                             case 1 -> {
-                                // enter file name
-                                System.out.println(input.readUTF());
+                                System.out.println("Enter name:");
                                 output.writeUTF(scanner.nextLine());
 
-                                // req
-                                System.out.println(input.readUTF());
+                                System.out.println("The request was sent.");
 
                                 System.out.println(input.readUTF());
                             }
                             case 2 -> {
-                                // enter file id
-                                System.out.println(input.readUTF());
+                                System.out.println("Enter id:");
                                 long id = -1;
                                 try {
-                                    id = Long.parseLong(scanner.nextLine().trim());
+                                    id = Long.parseLong(scanner.nextLine());
                                 } catch (Exception ignored) {
+                                    System.out.println("Wrong answer!");
                                 }
                                 output.writeLong(id);
 
-                                // req
-                                System.out.println(input.readUTF());
+                                System.out.println("The request was sent.");
 
                                 System.out.println(input.readUTF());
                             }
                         }
                     }
+                    default -> {
+                        output.writeUTF(action);
+                        if (action.equals("exit")) {
+                            System.exit(0);
+                        }
+                    }
                 }
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
